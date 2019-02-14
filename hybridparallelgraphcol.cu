@@ -102,8 +102,8 @@ void assign_color(struct new_csr_graph *input_graph){
 		if(cont && !change){
 			curandState* d_states;
 			cudaMalloc((void **)&d_states, input_graph->v_count * sizeof(curandState));
-			cudaFree(d_states);
 			random_generate<<<ceil(input_graph->v_count/256.0),256>>>(d_node_val, d_states, time(NULL), input_graph->v_count);
+			cudaFree(d_states);
 		}
 		else{
 			cur_color+=2;
