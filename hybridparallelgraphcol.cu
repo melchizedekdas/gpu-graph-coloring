@@ -116,42 +116,130 @@ void assign_color(struct new_csr_graph *input_graph){
 	cudaMemcpy(input_graph->color,d_color,input_graph->v_count*sizeof(int),cudaMemcpyDeviceToHost);
 	cudaFree(d_color);
 }
+int init_input_graph(struct new_csr_graph *input_graph, char *file_name){
+	struct edge{
+		int vertex1, vertex2;
+	}*edge_list;
+	FILE *file_pointer ;
+	// in read mode using "r" attribute
+	file_pointer = fopen(file_name, "r") ;
+	if ( file_pointer == NULL )
+	{
+		return 1;
+	}
+	char new_line_flag=1, line_type=0, c;
+	int param1=0, param2=0;
+	int phase=1, edge_id=0, e_count, i;
+	for (c = getc(file_pointer); c != EOF; c = getc(file_pointer))
+	{
+		if(c=='\n'){
+			new_line_flag=1;
+			if(line_type=='p'){
+				input_graph->v_count=param1;
+				e_count=param2;
+				input_graph->IA=(int *)malloc((param1+1)*sizeof(int));
+				input_graph->A=(int *)malloc(param2*2*sizeof(int));
+				input_graph->color=(int *)malloc(param1*sizeof(int));
+				for(i=0;i<=param1;i++){
+					input_graph->IA[i]=0;
+				}
+				edge_list=(struct edge *)malloc(param2*sizeof(struct edge));
+			}
+			else if(line_type=='e'){
+				edge_list[edge_id].vertex1=param1-1;
+				edge_list[edge_id].vertex2=param2-1;
+				input_graph->IA[param1]++;
+				input_graph->IA[param2]++;
+				edge_id++;
+			}
 
-void init_input_graph(struct new_csr_graph *input_graph){
-	input_graph->v_count=8;
-	input_graph->A=(int *)malloc(sizeof(int)*16);
-	input_graph->IA=(int *)malloc(sizeof(int)*9);
-	input_graph->color=(int *)malloc(sizeof(int)*input_graph->v_count);
-	input_graph->A[0]=1;
-	input_graph->A[1]=2;
-	input_graph->A[2]=0;
-	input_graph->A[3]=2;
-	input_graph->A[4]=0;
-	input_graph->A[5]=1;
-	input_graph->A[6]=3;
-	input_graph->A[7]=2;
-	input_graph->A[8]=4;
-	input_graph->A[9]=3;
-	input_graph->A[10]=5;
-	input_graph->A[11]=6;
-	input_graph->A[12]=7;
-	input_graph->A[13]=4;
-	input_graph->A[14]=4;
-	input_graph->A[15]=4;
+			param1=0, param2=0;
+			line_type=0;
+			continue;
+		}
+		if(new_line_flag){
+			line_type=c;
+			phase=1;
+			new_line_flag=0;
+			continue;
+		}
+		if(line_type=='e'){
+			switch(phase){
+			case 1:
+				if(c>='0' && c<='9'){
+					param1=c-'0';
+					phase++;
+				}
+				break;
+			case 2:
+				if(c>='0' && c<='9'){
+					param1=param1*10+c-'0';
+				}
+				else{
+					phase++;
+				}
+				break;
+			case 3:
+				if(c>='0' && c<='9'){
+					param2=param2*10+c-'0';
+				}
+				else{
+					phase++;
+				}
+				break;
+			}
+		}
 
-	input_graph->IA[0]=0;
-	input_graph->IA[1]=2;
-	input_graph->IA[2]=4;
-	input_graph->IA[3]=7;
-	input_graph->IA[4]=9;
-	input_graph->IA[5]=13;
-	input_graph->IA[6]=14;
-	input_graph->IA[7]=15;
-	input_graph->IA[8]=16;
+		else if(line_type=='p'){
+			switch(phase){
+			case 1:
+				if(c>='0' && c<='9'){
+					param1=c-'0';
+					phase++;
+				}
+				break;
+			case 2:
+				if(c>='0' && c<='9'){
+					param1=param1*10+c-'0';
+				}
+				else{
+					phase++;
+				}
+				break;
+			case 3:
+				if(c>='0' && c<='9'){
+					param2=param2*10+c-'0';
+				}
+				else{
+					phase++;
+				}
+				break;
+			}
+		}
+	}
+	fclose(file_pointer) ;
+	if(!new_line_flag && line_type=='e'){
+		edge_list[edge_id].vertex1=param1-1;
+		edge_list[edge_id].vertex2=param2-1;
+		input_graph->IA[param1]++;
+		input_graph->IA[param2]++;
+	}
+	int *vertex_p=(int *)malloc(input_graph->v_count*sizeof(int));
+	for(i=0;i<input_graph->v_count;i++){
+		input_graph->IA[i+1]+=input_graph->IA[i];
+		vertex_p[i]=0;
+	}
+	for(edge_id=0;edge_id<e_count;edge_id++){
+		input_graph->A[input_graph->IA[edge_list[edge_id].vertex1]+(vertex_p[edge_list[edge_id].vertex1]++)]=edge_list[edge_id].vertex2;
+		input_graph->A[input_graph->IA[edge_list[edge_id].vertex2]+(vertex_p[edge_list[edge_id].vertex2]++)]=edge_list[edge_id].vertex1;
+	}
+	free(edge_list);
+	free(vertex_p);
+	return 0;
 }
 int main(){
 	struct new_csr_graph input_graph;
-	init_input_graph(&input_graph);
+	init_input_graph(&input_graph, "input.txt");
 	assign_color(&input_graph);
 	printf("\nresult coloring:");
 	for(int i=0;i<input_graph.v_count;i++){
