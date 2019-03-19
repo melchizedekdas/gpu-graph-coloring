@@ -37,6 +37,10 @@ void minmax_kernel(int *d_A, int *d_IA, int *d_color, float *d_node_val, char *d
 		float edge_node_val;
 		char is_min=1, is_max=1;
 		for(int i=d_IA[vertex_id];i<total;i++){
+			if(d_color[d_A[i]]!=NO_COLOR){
+				//if this adjacent vertex is already colored then continue
+				continue;
+			}
 			edge_node_val=d_node_val[d_A[i]];
 			if(edge_node_val<=curr_node_val){
 				is_min=0;
@@ -90,6 +94,7 @@ void assign_color(struct new_csr_graph *input_graph){
 
 	init_kernel<<<ceil(input_graph->v_count/256.0),256>>>(d_color, d_node_val, d_IA, input_graph->v_count);
 
+	int rand_ver=0;
 	while(cont){
 		cont=0;
 		change=0;
@@ -102,7 +107,7 @@ void assign_color(struct new_csr_graph *input_graph){
 		if(cont && !change){
 			curandState* d_states;
 			cudaMalloc((void **)&d_states, input_graph->v_count * sizeof(curandState));
-			random_generate<<<ceil(input_graph->v_count/256.0),256>>>(d_node_val, d_states, time(NULL), input_graph->v_count);
+			random_generate<<<ceil(input_graph->v_count/256.0),256>>>(d_node_val, d_states, time(NULL)+rand_ver++, input_graph->v_count);
 			cudaFree(d_states);
 		}
 		else{
