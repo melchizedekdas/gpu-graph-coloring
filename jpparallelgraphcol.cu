@@ -14,10 +14,11 @@ struct new_csr_graph{
 };
 
 __global__
-void init_kernel(int *d_color, float *d_node_val, int *d_IA, int v_count){
+void init_kernel(int *d_color, float *d_node_val, curandState* state, unsigned long seed, int v_count){
 	int vertex_id=blockIdx.x*blockDim.x+threadIdx.x;
 	if(vertex_id<v_count){
-		d_node_val[vertex_id]=d_IA[vertex_id+1]-d_IA[vertex_id];
+		curand_init ( seed, vertex_id, 0, &state[vertex_id] );
+		d_node_val[vertex_id]=curand_uniform(state+vertex_id);
 		d_color[vertex_id]=NO_COLOR;
 	}
 }
@@ -93,9 +94,13 @@ void assign_color(struct new_csr_graph *input_graph){
 	cudaMemcpy(d_A,input_graph->A,input_graph->IA[input_graph->v_count]*sizeof(int),cudaMemcpyHostToDevice);
 	cudaMemcpy(d_IA,input_graph->IA,(input_graph->v_count+1)*sizeof(int),cudaMemcpyHostToDevice);
 
-	init_kernel<<<ceil(input_graph->v_count/256.0),256>>>(d_color, d_node_val, d_IA, input_graph->v_count);
 
-	int rand_ver=0;
+	curandState* d_states;
+	cudaMalloc((void **)&d_states, input_graph->v_count * sizeof(curandState));
+	init_kernel<<<ceil(input_graph->v_count/256.0),256>>>(d_color, d_node_val, d_states, time(NULL), input_graph->v_count);
+	cudaFree(d_states);
+
+	int rand_ver=1;
 	while(cont){
 		cont=0;
 		change=0;
@@ -106,7 +111,6 @@ void assign_color(struct new_csr_graph *input_graph){
 		cudaMemcpy(&cont,d_cont,sizeof(char),cudaMemcpyDeviceToHost);
 		cudaMemcpy(&change,d_change,sizeof(char),cudaMemcpyDeviceToHost);
 		if(cont && !change){
-			curandState* d_states;
 			cudaMalloc((void **)&d_states, input_graph->v_count * sizeof(curandState));
 			random_generate<<<ceil(input_graph->v_count/256.0),256>>>(d_node_val, d_states, time(NULL)+rand_ver++, input_graph->v_count);
 			cudaFree(d_states);
